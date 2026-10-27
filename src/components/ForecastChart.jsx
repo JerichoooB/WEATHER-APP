@@ -1,0 +1,6 @@
+import {ResponsiveContainer,AreaChart,Area,XAxis,YAxis,Tooltip,CartesianGrid} from 'recharts';
+import {hourLabel} from '../utils/weather';
+export default function ForecastChart({hours,unit}) {
+ const items=hours.map(h=>({time:hourLabel(h.time),temperature:Math.round(unit==='F'?h.temp*9/5+32:h.temp)}));
+ return <div className="chart" role="img" aria-label={`Temperature trend for the next ${hours.length} hours in degrees ${unit}`}><ResponsiveContainer width="100%" height="100%"><AreaChart data={items} margin={{top:15,right:12,left:-20,bottom:0}}><defs><linearGradient id="blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#47a6ff" stopOpacity={.4}/><stop offset="100%" stopColor="#47a6ff" stopOpacity={0}/></linearGradient></defs><CartesianGrid stroke="var(--border)" vertical={false}/><XAxis dataKey="time" tick={{fill:'#8fa7c3',fontSize:11}} axisLine={false} tickLine={false} minTickGap={45}/><YAxis tick={{fill:'#8fa7c3',fontSize:11}} axisLine={false} tickLine={false} unit="°" domain={['auto','auto']}/><Tooltip contentStyle={{background:'#11233a',border:'1px solid #35506b',borderRadius:12,color:'white'}} formatter={v=>[`${v}°${unit}`,'Temperature']}/><Area type="monotone" dataKey="temperature" stroke="#47a6ff" strokeWidth={3} fill="url(#blue)" connectNulls={false}/></AreaChart></ResponsiveContainer></div>;
+}
