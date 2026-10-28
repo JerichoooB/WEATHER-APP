@@ -1,65 +1,73 @@
 # SkyCast
 
-A responsive weather dashboard built with React, Vite, Tailwind CSS v4, Lucide, Motion, Recharts, and Leaflet. Default location: Baguio City, Philippines.
+A responsive React weather dashboard. **Current conditions: WeatherAPI. Hourly and seven-day forecasts: Open-Meteo.** City search uses Open-Meteo Geocoding; maps use Leaflet and OpenStreetMap.
 
-## Develop
+## Setup
 
-Use Node.js 22.12+ (tested on Node 24) and npm:
+Use Node.js 22.12+ (tested with Node 24) and npm. Supply `WEATHERAPI_KEY` securely in the **server runtime environment**. Get a key from [WeatherAPI](https://www.weatherapi.com/). Current conditions use `/v1/current.json`; no paid WeatherAPI forecast plan is required by this integration. Provider account limits and terms apply.
+
+Never commit the key or name it with a `VITE_` prefix: Vite-prefixed values are embedded in the public browser bundle. `.env.example` lists the required variable without a value. For local development, export the variable in your shell or use your secret manager before starting the process; merely creating a `.env` file does not inject it into this server.
 
 ```sh
 npm ci --cache /workspace/.npm-cache
-npm run dev
+npm run dev -- --port 5173
 ```
 
-For other machines, omit `--cache /workspace/.npm-cache` or choose a writable directory. The development server defaults to port 5173. No API key, database, or backend is required.
+Outside this cloud environment, omit the cache option or choose a writable directory.
+
+## Production
 
 ```sh
 npm run build
-npm run preview
-npm test
+npm start
 ```
 
-Browser tests use system Chromium at `/usr/bin/chromium`. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to another installed Chromium executable when needed. Tests cover weather rendering, city search and selection, unit conversion, persistence, favorites, themes, navigation, error recovery, and mobile overflow. Weather and geocoding responses are intercepted in tests; fixtures are never used in the application.
+The production Node server serves `dist` and `/api/current-weather` on `PORT` (default 3000). `npm run preview` also starts this server. A static-file-only host cannot serve the protected WeatherAPI endpoint. Vercel can use `api/current-weather.js` as a Node function alongside the Vite build; configure `WEATHERAPI_KEY` in the project's server environment and rebuild/redeploy as appropriate. Other hosts must run `server/index.js` or provide an equivalent server endpoint.
 
-## Features
+## Data accuracy and freshness
 
-- Current weather with feels-like temperature, humidity, wind direction and speed, and surface pressure
-- Twelve-hour outlook, seven-day forecast, and a 24-hour interactive temperature chart
-- UV index, visibility, precipitation probability, cloud cover, dew point, sunrise, and sunset
-- Debounced worldwide city search with cancellation and keyboard navigation
-- Interactive OpenStreetMap map, centered on the selected city; no simulated radar layer
-- Celsius/Fahrenheit, dark/light themes, favorite cities, and last selected city stored in localStorage
-- Manual refresh, retrieval timestamp, and opt-in browser geolocation
-- Responsive layouts, reduced-motion support, loading placeholders, and actionable error states
+WeatherAPI supplies provider-reported current temperature, feels-like temperature, humidity, wind, pressure, sky condition, visibility, and UV. Open-Meteo supplies hourly forecasts, seven-day highs/lows, precipitation probabilities, hourly dew point, and sunrise/sunset. Current-condition timestamps shown on the dashboard come from WeatherAPI's `last_updated_epoch` in the selected city's time zone. A manual refresh retrieves the latest available response; it cannot force the provider to generate a new observation. Data revalidates every ten minutes while visible and when a stale tab regains focus. The server caches current conditions for five minutes per coordinate pair, with a bounded in-memory cache.
 
-## Data and external services
+Changing providers does not guarantee better accuracy at every location. Current conditions can be based on stations and provider processing, and mountainous locations such as Baguio can vary sharply with elevation. Forecasts remain model estimates. Missing values display a dash. If WeatherAPI is not configured or fails, the UI explains the failure, keeps available forecasts, and does **not** silently substitute model-based current readings.
 
-Forecast: `https://api.open-meteo.com/v1/forecast`.
-Search: `https://geocoding-api.open-meteo.com/v1/search`.
-Weather requests use `timezone=auto`; all forecast timestamps are interpreted as city-local wall times. Greeting and clock use the returned IANA time zone. Daily UV uses the forecast maximum; visibility and dew point use the current forecast hour. Missing values display a dash. Wind is km/h, pressure is hPa, and visibility is km regardless of temperature preference. Forecasts are model estimates, not guaranteed observations.
+Temperatures can be Celsius or Fahrenheit; wind remains km/h, pressure hPa (WeatherAPI-reported pressure), and visibility km. Forecast requests use `timezone=auto`. Dew point and precipitation probability refer to the current forecast hour. Geolocation runs only after the user clicks its button; location permission requires HTTPS or localhost. Favorites, selected city, unit, and theme stay in localStorage.
 
-The map uses `tile.openstreetmap.org`, with OpenStreetMap attribution. It requires Internet access and follows the provider's public tile policy; use a suitable tile provider before high-traffic production deployment. Hero photographs are stored locally in `public/images` and selected by weather code/daylight. Their Unsplash source photo IDs are sunny: `1464822759023-fed622ff2c3b`, cloudy: `1470770841072-f978cf4d019e`, rainy: `1515694346937-94d85e41e6f0`, stormy: `1504253163759-c23fccaebb55`, night: `1519681393784-d120267933ba`, and snow: `1483664852095-d6cc6870702d`. Prefix each ID with `https://images.unsplash.com/photo-` to view its original source photograph. Fonts load from `fonts.googleapis.com` and `fonts.gstatic.com`, with a system font fallback. Unsplash photographs are provided under the [Unsplash license](https://unsplash.com/license); they are landscape illustrations, not live views of the selected city.
+## External services and security
 
-Required network hostnames:
+Runtime network destinations:
 
-- api.open-meteo.com
-- geocoding-api.open-meteo.com
-- tile.openstreetmap.org
-- images.unsplash.com (only to refresh bundled photography)
-- fonts.googleapis.com
-- fonts.gstatic.com
-- registry.npmjs.org (dependency installation)
+- `api.weatherapi.com` — server-only current conditions, HTTPS
+- `api.open-meteo.com` — browser forecasts
+- `geocoding-api.open-meteo.com` — browser city search
+- `tile.openstreetmap.org` — geographic map tiles, with attribution; no radar overlay
+- `fonts.googleapis.com` and `fonts.gstatic.com` — Inter, with system fallback
+- `registry.npmjs.org` — dependency installation
 
-No credentials are needed. Browser geolocation requires a secure context (HTTPS or localhost) and permission requested by the user clicking “Use my location.” For device coordinates, the name displays “Your location”; no reverse-geocoding service is used.
+The current-weather endpoint validates coordinates, accepts GET only, applies an upstream timeout, strips unused fields, and does not expose the key or upstream request URLs in responses. Public deployments should additionally configure hosting-level rate limits to protect their API quota. Keep all credentials server-side.
+
+Background photographs are local in `public/images`, selected by condition and daylight. Unsplash source IDs: sunny `1464822759023-fed622ff2c3b`, cloudy `1470770841072-f978cf4d019e`, rainy `1515694346937-94d85e41e6f0`, stormy `1504253163759-c23fccaebb55`, night `1519681393784-d120267933ba`, snow `1483664852095-d6cc6870702d`. Prefix each with `https://images.unsplash.com/photo-` to view the source. [Unsplash license](https://unsplash.com/license). These are landscape illustrations, not live views of the city.
+
+## Tests
+
+```sh
+npm test
+npm run build
+# With a configured key and the dev server running:
+node scripts/live-smoke.mjs
+```
+
+Node tests exercise the server's validation, missing-key handling, response filtering, caching, and upstream failures. Playwright tests cover dashboard behavior, city switching, favorites, units, themes, navigation, mobile overflow, and missing WeatherAPI configuration using controlled provider-shaped responses. No fixture values are used in the application.
+
+Browser tests use `/usr/bin/chromium`; set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` for another installed executable. In the cloud environment, native Chromium requests can reject the proxy certificate. The live smoke script forwards real HTTPS responses through Playwright's Node transport using the platform's trusted CA configuration, preserving TLS verification. This is a test transport, not an application fallback.
+
+The WeatherAPI migration passes the build and controlled tests. Live WeatherAPI validation remains pending a configured `WEATHERAPI_KEY`; no key was available when the integration was implemented. Earlier live checks validated Open-Meteo, geocoding, map tiles, and local images. The requested Design #1 reference was not attached, so the design follows the supplied written specification.
 
 ## Architecture
 
-`src/services/weatherApi.js` owns API requests. `src/hooks/useWeather.js` manages cancellation, retrieval state, and persistent preferences. `src/utils/weather.js` maps WMO codes and formats city-local values. Components own autocomplete, icons, maps, and charts. Map and chart modules are loaded lazily. `src/App.jsx` coordinates the dashboard and its four views.
-
-## Validation and limitations
-
-The production build and three browser tests pass in the cloud environment. A separate live smoke test successfully retrieved Baguio weather, searched for and selected Tokyo, loaded real OpenStreetMap tiles and local imagery, and rendered the forecast chart without JavaScript runtime errors.
-
-To repeat the live check, start the dev server and run `node scripts/live-smoke.mjs`. In this cloud environment, native Chromium HTTPS requests reject the environment proxy certificate. The live smoke test routes external browser requests through Playwright's Node HTTPS transport, which trusts the platform-provided `NODE_EXTRA_CA_CERTS`, uses the configured proxy, and preserves TLS verification. It forwards actual live responses without fixtures. This verifies live integration through that transport; direct Chromium HTTPS access in the cloud still has a trust limitation. Normal deployment requires standard browser-trusted HTTPS access to the providers. The network domains and reusable install/start instructions were saved to the environment draft; publication remains a user action.
-
-The requested Design #1 reference image was not attached, so the implementation follows the supplied written visual specification. The app contains no hardcoded sample-weather fallback. On network/provider failures it shows an error and retry action instead of invented readings.
+- `server/currentWeather.js`: protected WeatherAPI proxy, shared by Vite, Node production, and Vercel
+- `server/index.js`: standalone production HTTP server
+- `src/services/weatherApi.js`: client data composition and provider normalization
+- `src/hooks/useWeather.js`: requests, cancellation, periodic revalidation, and saved preferences
+- `src/utils`: weather codes, icons, and formatting
+- `src/components`: city search, chart, weather icon, and interactive map
+- `src/App.jsx`: dashboard and navigation views
