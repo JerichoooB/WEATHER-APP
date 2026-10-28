@@ -4,9 +4,7 @@ function forecast() {
  // Fixed provider-shaped fixtures are used only by tests, never application fallbacks.
  return {timezone:'Asia/Manila',current:{time:time[16],temperature_2m:18,apparent_temperature:17,relative_humidity_2m:82,is_day:1,weather_code:2,cloud_cover:40,surface_pressure:850,wind_speed_10m:8,wind_direction_10m:90},hourly:{time,temperature_2m:time.map((_,i)=>18+Math.sin(i)*3),weather_code:time.map(()=>2),precipitation_probability:time.map(()=>20),visibility:time.map(()=>12000),dew_point_2m:time.map(()=>14),is_day:time.map((_,i)=>i%24>=6&&i%24<18?1:0)},daily:{time:Array.from({length:7},(_,i)=>new Date(Date.UTC(2026,9,27+i)).toISOString().slice(0,10)),weather_code:Array(7).fill(2),temperature_2m_max:Array(7).fill(23),temperature_2m_min:Array(7).fill(16),sunrise:Array(7).fill('2026-10-27T05:50'),sunset:Array(7).fill('2026-10-27T17:40'),uv_index_max:Array(7).fill(6),precipitation_probability_max:Array(7).fill(20)}};
 }
-const current={current:{last_updated_epoch:1793097600,temp_c:18,feelslike_c:17,humidity:82,wind_kph:8,wind_degree:90,pressure_mb:1012,cloud:40,is_day:1,vis_km:12,uv:6,condition:{code:1003,text:'Partly cloudy'}}};
 async function mock(page) {
- await page.route('**/api/current-weather?**',r=>r.fulfill({json:current}));
  await page.route('https://api.open-meteo.com/**',r=>r.fulfill({json:forecast()}));
  await page.route('https://geocoding-api.open-meteo.com/**',r=>r.fulfill({json:{results:[{id:1,name:'Tokyo',admin1:'Tokyo',country:'Japan',latitude:35.68,longitude:139.69}]}}));
  await page.route(/https:\/\/(images\.unsplash\.com|fonts\.(googleapis|gstatic)\.com|tile\.openstreetmap\.org)\//,r=>r.abort());
@@ -37,15 +35,4 @@ test('mobile dashboard fits viewport and navigation works',async({page})=>{
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.getByLabel('Toggle navigation').click();await page.getByRole('button',{name:'Forecast',exact:true}).click();await expect(page.getByRole('heading',{name:'Temperature trend'})).toBeVisible();
  await page.screenshot({path:'/tmp/skycast-mobile.png',fullPage:true});
-});
-
-test('reports missing WeatherAPI setup without falling back to model current readings',async({page})=>{
- await mock(page);await page.route('**/api/current-weather?**',r=>r.fulfill({status:503,json:{error:'WeatherAPI is not connected yet. Add WEATHERAPI_KEY in the server environment settings.'}}));await page.goto('/');
- await expect(page.getByRole('alert')).toContainText('WEATHERAPI_KEY');await expect(page.locator('.temperature-line')).toHaveCount(0);
-});
-test('refreshes current conditions after ten minutes',async({page})=>{
- await page.clock.install();await mock(page);let requests=0;
- await page.route('**/api/current-weather?**',r=>{requests++;return r.fulfill({json:current});});
- await page.goto('/');await expect(page.locator('.temperature-line')).toContainText('18°');const before=requests;
- await page.clock.fastForward(10*60*1000+1000);await expect.poll(()=>requests).toBeGreaterThan(before);await expect(page.locator('.temperature-line')).toContainText('18°');
 });

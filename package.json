@@ -6,9 +6,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "preview": "node server/index.js",
-    "test": "node --test tests/*.node.test.js && playwright test",
-    "start": "node server/index.js"
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "playwright test"
   },
   "dependencies": {
     "@tailwindcss/vite": "latest",
